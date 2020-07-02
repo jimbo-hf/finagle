@@ -3,13 +3,13 @@ package com.twitter.finagle.netty4.http
 import com.twitter.finagle.http.exp.{Multipart, MultipartDecoder}
 import com.twitter.finagle.http.Request
 import com.twitter.io.Buf
-import com.twitter.util.StorageUnit
+import com.twitter.util.{Future,StorageUnit}
 import io.netty.handler.codec.http.multipart._
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 private[finagle] class Netty4MultipartDecoder extends MultipartDecoder {
-  protected def decodeFull(req: Request, maxInMemoryFileSize: StorageUnit): Option[Multipart] = {
+  protected def decodeFull(req: Request, maxInMemoryFileSize: StorageUnit): Future[Option[Multipart]] = {
     val decoder = new HttpPostMultipartRequestDecoder(
       new DefaultHttpDataFactory(maxInMemoryFileSize.inBytes),
       Bijections.finagle.requestToNetty(req, req.contentLength)
@@ -45,6 +45,6 @@ private[finagle] class Netty4MultipartDecoder extends MultipartDecoder {
       case _ => // ignore everything else
     }
 
-    Some(Multipart(attrs.mapValues(_.toSeq).toMap, files.mapValues(_.toSeq).toMap))
+    Future.value(Some(Multipart(attrs.mapValues(_.toSeq).toMap, files.mapValues(_.toSeq).toMap)))
   }
 }

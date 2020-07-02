@@ -1,11 +1,11 @@
 package com.twitter.finagle.http
 
 import com.twitter.finagle.http.exp.{Multipart, MultipartDecoder}
-import org.scalatest.FunSuite
 import com.twitter.io.{Buf, Files}
+import com.twitter.util.{Await, Duration}
+import org.scalatest.FunSuite
 
 abstract class AbstractMultipartDecoderTest(decoder: MultipartDecoder) extends FunSuite {
-
   /*
    * The generated request is equivalent to the following form:
    *
@@ -24,12 +24,12 @@ abstract class AbstractMultipartDecoderTest(decoder: MultipartDecoder) extends F
       .buildFormPost(multipart = true)
 
   test("Attribute") {
-    assert(decoder.decode(newRequest(Buf.Empty)).get.attributes("type").head == "text")
+    assert(decode(newRequest(Buf.Empty)).get.attributes("type").head == "text")
   }
 
   test("FileUpload (in-memory)") {
     val foo = Buf.Utf8("foo")
-    val multipart = decoder.decode(newRequest(foo)).get
+    val multipart = decode(newRequest(foo)).get
 
     val Multipart.InMemoryFileUpload(buf, contentType, fileName, contentTransferEncoding) =
       multipart.files("groups").head
@@ -44,7 +44,7 @@ abstract class AbstractMultipartDecoderTest(decoder: MultipartDecoder) extends F
 
   test("FileUpload (on-disk)") {
     val foo = Buf.Utf8("." * (Multipart.DefaultMaxInMemoryFileSize.inBytes.toInt + 10))
-    val multipart = decoder.decode(newRequest(foo)).get
+    val multipart = decode(newRequest(foo)).get
 
     val Multipart.OnDiskFileUpload(file, contentType, fileName, contentTransferEncoding) =
       multipart.files("groups").head
@@ -58,19 +58,20 @@ abstract class AbstractMultipartDecoderTest(decoder: MultipartDecoder) extends F
   }
 
   test("Not a multipart request") {
-    assert(decoder.decode(Request()).isEmpty)
-    assert(decoder.decode(Request(Method.Post, "/")).isEmpty)
+    assert(decode(Request()).isEmpty)
+    assert(decode(Request(Method.Post, "/")).isEmpty)
     assert(
-      decoder
-        .decode(
-          { val r = Request(Method.Post, "/"); r.contentType = "application/json"; r }
-        ).isEmpty
+      decode(
+        { val r = Request(Method.Post, "/"); r.contentType = "application/json"; r }
+      ).isEmpty
     )
     assert(
-      decoder
-        .decode(
-          { val r = Request(Method.Put, "/"); r.contentType = "multipart/form-data"; r }
-        ).isEmpty
+      decode(
+        { val r = Request(Method.Put, "/"); r.contentType = "multipart/form-data"; r }
+      ).isEmpty
     )
   }
+
+    private def decode(r: Request) =
+    Await.result(decoder.decode(r), Duration.fromSeconds(5))
 }
