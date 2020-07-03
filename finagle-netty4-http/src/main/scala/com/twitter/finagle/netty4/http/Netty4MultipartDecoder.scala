@@ -10,6 +10,7 @@ import io.netty.handler.codec.http.{DefaultHttpContent, DefaultLastHttpContent}
 import io.netty.handler.codec.http.multipart._
 import scala.collection.mutable
 import scala.jdk.CollectionConverters._
+import io.netty.handler.codec.http.LastHttpContent
 
 private[finagle] class Netty4MultipartDecoder extends MultipartDecoder {
   protected def decodeFull(req: Request, maxInMemoryFileSize: StorageUnit): Future[Option[Multipart]] = {
@@ -24,11 +25,10 @@ private[finagle] class Netty4MultipartDecoder extends MultipartDecoder {
     (if (req.isChunked) {
       Reader.toAsyncStream(req.chunkReader).map { chunk =>
         val byteBuf = ByteBufConversion.bufAsByteBuf(chunk.content)
-        if (chunk.isLast) new DefaultLastHttpContent(byteBuf)
-        else new DefaultHttpContent(byteBuf)
+        new DefaultHttpContent(byteBuf)
       }.foreach(decoder.offer)
     } else Future.Void).map { _ =>
-
+      decoder.offer(LastHttpContent.EMPTY_LAST_CONTENT)
       decoder.getBodyHttpDatas.asScala.foreach {
         case attr: Attribute =>
           val buf = attrs.getOrElseUpdate(attr.getName, mutable.ListBuffer[String]())
